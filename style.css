@@ -240,6 +240,8 @@ input[type="time"] { width: auto; color-scheme: dark; direction: ltr; }
 .moods button:hover { transform: translateY(-3px); filter: none; }
 .moods button.active { border-color: var(--green); filter: none; background: var(--green-soft); }
 
+.backup { position: relative; z-index: 1; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; padding: 4px 16px 10px; }
+.backup .btn { font-size: .9rem; }
 .foot { position: relative; z-index: 1; text-align: center; color: var(--muted); font-size: .85rem; padding: 10px; }
 
 /* ---------- WALKING CAT ---------- */

@@ -307,6 +307,33 @@
     toast(walker.classList.contains("sleep") ? "پیشی کوچولو خوابید 😴" : "پیشی بیدار شد! 🐾");
   });
 
+  // ---------- Backup to / from file ----------
+  $("#exportBtn").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(db, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `pishi-planner-${TODAY}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast("فایل ذخیره شد 💾");
+  });
+
+  $("#importFile").addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      if (!data || typeof data.days !== "object") throw new Error("bad");
+      if (!confirm("اطلاعات فعلی با محتوای فایل جایگزین بشه؟")) return;
+      localStorage.setItem(KEY, JSON.stringify(data));
+      location.reload();
+    } catch {
+      toast("این فایل معتبر نیست 😿");
+    } finally {
+      e.target.value = "";
+    }
+  });
+
   // ---------- Init ----------
   renderTasks();
   renderSchedule();
