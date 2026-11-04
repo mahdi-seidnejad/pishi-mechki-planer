@@ -62,18 +62,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
 @keyframes wiggle { 0%,100% { transform: rotate(0); } 50% { transform: rotate(-14deg); } }
 .date { margin: 0; color: var(--muted); }
 
-.big-cat-wrap { position: relative; width: 175px; flex-shrink: 0; }
+.big-cat-wrap { position: relative; width: 210px; flex-shrink: 0; }
 .big-cat { width: 100%; display: block; cursor: pointer; filter: drop-shadow(0 0 1.5px rgba(62,224,122,.55)) drop-shadow(0 12px 26px rgba(62,224,122,.22)); }
-.big-cat .head { transform-origin: 108px 260px; animation: headTilt 6s ease-in-out infinite; }
-@keyframes headTilt { 0%,100% { transform: rotate(0); } 30% { transform: rotate(-5deg); } 60% { transform: rotate(4deg); } }
-.big-cat .tail { transform-origin: 120px 118px; animation: tail 3s ease-in-out infinite; }
-@keyframes tail { 0%,100% { transform: rotate(-6deg); } 25% { transform: rotate(10deg) skewX(4deg); } 50% { transform: rotate(-12deg); } 75% { transform: rotate(6deg) skewX(-3deg); } }
-.big-cat .body { transform-origin: 122px 190px; animation: breathe 3.6s ease-in-out infinite; }
-@keyframes breathe { 50% { transform: scale(1.025, 1.04); } }
-.big-cat .ear-l { transform-origin: 70px 196px; animation: earL 5s ease-in-out infinite; }
-.big-cat .ear-r { transform-origin: 146px 190px; animation: earR 7s ease-in-out infinite; }
-@keyframes earL { 0%,88%,100% { transform: rotate(0); } 91% { transform: rotate(-14deg); } 94% { transform: rotate(4deg); } }
-@keyframes earR { 0%,84%,100% { transform: rotate(0); } 88% { transform: rotate(14deg); } }
+.big-cat .head { transform-origin: 110px 150px; animation: headTilt 6s ease-in-out infinite; }
+@keyframes headTilt { 0%,100% { transform: rotate(0); } 30% { transform: rotate(-4deg); } 60% { transform: rotate(3deg); } }
+.big-cat .tail { transform-origin: 150px 170px; animation: tail 2.2s ease-in-out infinite; }
+@keyframes tail { 0%,100% { transform: rotate(0); } 50% { transform: rotate(-16deg); } }
+.big-cat .ear-l { transform-origin: 75px 70px; animation: earL 5s ease-in-out infinite; }
+.big-cat .ear-r { transform-origin: 145px 70px; animation: earR 7s ease-in-out infinite; }
+@keyframes earL { 0%,90%,100% { transform: rotate(0); } 94% { transform: rotate(-12deg); } }
+@keyframes earR { 0%,85%,100% { transform: rotate(0); } 90% { transform: rotate(12deg); } }
 .big-cat .lid { transform: scaleY(0); transform-box: fill-box; transform-origin: top; animation: blink 4.5s infinite; }
 @keyframes blink { 0%,92%,100% { transform: scaleY(0); } 95% { transform: scaleY(1); } }
 .big-cat .pupil { transition: transform .12s ease-out; }
@@ -343,7 +341,7 @@ input[type="time"] { width: auto; color-scheme: dark; direction: ltr; }
 }
 @media (max-width: 680px) {
   .hero { padding: 20px 16px 0; align-items: center; }
-  .big-cat-wrap { width: 110px; }
+  .big-cat-wrap { width: 130px; }
   .speech { font-size: .8rem; left: 55%; }
   .grid { grid-template-columns: 1fr; padding: 16px; gap: 16px; }
   .weekbar { margin: 16px 16px 0; padding: 10px; }
