@@ -92,16 +92,26 @@
     </div>
   </header>
 
+  <nav class="weekbar" aria-label="انتخاب روز هفته">
+    <div class="wb-head">
+      <button class="icon-btn" id="prevWeek" aria-label="هفته قبل">→</button>
+      <div class="wb-title"><b id="weekLabel"></b><small id="selDay"></small></div>
+      <button class="icon-btn" id="nextWeek" aria-label="هفته بعد">←</button>
+      <button class="chip" id="goToday">امروز</button>
+    </div>
+    <div class="wb-days" id="wbDays"></div>
+  </nav>
+
   <main class="grid">
     <!-- TODAY FOCUS -->
     <section class="card focus" aria-labelledby="focusTitle">
       <div class="card-head">
-        <h2 id="focusTitle"><span class="en">Today Focus</span> تمرکز امروز</h2>
+        <h2 id="focusTitle"><span class="en">Today Focus</span> <span id="focusDayName">تمرکز امروز</span></h2>
         <span class="badge" id="focusBadge">0/0</span>
       </div>
 
       <div class="main-goal">
-        <label for="mainGoal">🎯 مهم‌ترین هدف امروز</label>
+        <label for="mainGoal" id="goalLabel">🎯 مهم‌ترین هدف امروز</label>
         <input id="mainGoal" type="text" placeholder="مثلاً: تموم کردن پروژه..." maxlength="120" />
       </div>
 
@@ -148,6 +158,7 @@
           <option value="yellow">💛</option>
         </select>
         <button type="submit" class="btn">+</button>
+        <label class="repeat"><input type="checkbox" id="schedRepeat" /> تکرار برای همه روزهای این هفته</label>
       </form>
       <div class="timeline" id="timeline"></div>
     </section>
@@ -161,7 +172,7 @@
       <div class="stats">
         <div class="stat">
           <div class="ring" id="ring"><span id="ringText">0%</span></div>
-          <small>پیشرفت امروز</small>
+          <small id="progressLabel">پیشرفت امروز</small>
         </div>
         <div class="stat">
           <b id="statDone">0</b>
@@ -177,10 +188,10 @@
         </div>
       </div>
 
-      <h3>هفته‌ای که گذشت</h3>
+      <h3>این هفته <small>(روی هر ستون بزنی اون روز باز میشه)</small></h3>
       <div class="week" id="week"></div>
 
-      <h3>امروز حالت چطوره؟</h3>
+      <h3 id="moodTitle">امروز حالت چطوره؟</h3>
       <div class="moods" id="moods">
         <button data-mood="1" title="بد">😿</button>
         <button data-mood="2" title="معمولی">😾</button>

@@ -9,14 +9,34 @@
   };
   const db = load();
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch {} };
+  // ask the browser to never evict our storage
+  try { navigator.storage?.persist?.(); } catch {}
 
   const dateKey = (d = new Date()) => {
     const z = (n) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
   };
   const TODAY = dateKey();
-  const day = (k = TODAY) =>
+  let current = TODAY; // the day being viewed / planned
+  const day = (k = current) =>
     (db.days[k] ||= { goal: "", tasks: [], events: [], focusMin: 0, mood: 0, note: "" });
+
+  const parseKey = (k) => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
+  const addDays = (dt, n) => { const x = new Date(dt); x.setDate(x.getDate() + n); return x; };
+  // Iranian week: Saturday → Friday
+  const weekStart = (dt) => addDays(dt, -((dt.getDay() + 1) % 7));
+  const weekKeys = (k = current) => {
+    const s = weekStart(parseKey(k));
+    return Array.from({ length: 7 }, (_, i) => dateKey(addDays(s, i)));
+  };
+  const fmt = (opts) => {
+    try { return new Intl.DateTimeFormat("fa-IR-u-ca-persian", opts); }
+    catch { return new Intl.DateTimeFormat("fa-IR", opts); }
+  };
+  const fmtLong = fmt({ weekday: "long", day: "numeric", month: "long" });
+  const fmtWd = fmt({ weekday: "long" });
+  const fmtDay = fmt({ day: "numeric" });
+  const fmtDM = fmt({ day: "numeric", month: "long" });
 
   const uid = () => Math.random().toString(36).slice(2, 9);
   const $ = (s) => document.querySelector(s);
@@ -80,7 +100,7 @@
   });
 
   const cheer = () => {
-    const d = day();
+    const d = day(TODAY);
     const total = d.tasks.length, done = d.tasks.filter((t) => t.done).length;
     const pool = [
       "میو! تو می‌تونی 💚", "یه کم استراحت هم لازمه 😽", "خرررر... 🐾",
@@ -97,7 +117,6 @@
 
   // ---------- Today Focus ----------
   const goal = $("#mainGoal");
-  goal.value = day().goal;
   goal.addEventListener("input", () => { day().goal = goal.value; save(); });
 
   const renderTasks = () => {
@@ -113,6 +132,7 @@
     const done = d.tasks.filter((t) => t.done).length;
     $("#focusBadge").textContent = `${fa(done)}/${fa(d.tasks.length)}`;
     renderReport();
+    renderWeekbar();
   };
 
   $("#taskForm").addEventListener("submit", (e) => {
@@ -158,7 +178,7 @@
     pomoLeft--;
     const elapsedMin = Math.floor((pomoLen - pomoLeft) / 60);
     if (elapsedMin > pomoCounted) {
-      day().focusMin += elapsedMin - pomoCounted;
+      day(TODAY).focusMin += elapsedMin - pomoCounted;
       pomoCounted = elapsedMin;
       save(); renderReport();
     }
@@ -177,9 +197,9 @@
   $("#pomoReset").addEventListener("click", () => {
     pomoStop(); pomoLeft = pomoLen; pomoCounted = 0; pomoRender();
   });
-  document.querySelectorAll(".chip").forEach((c) =>
+  document.querySelectorAll(".pomo-modes .chip").forEach((c) =>
     c.addEventListener("click", () => {
-      document.querySelectorAll(".chip").forEach((x) => x.classList.remove("active"));
+      document.querySelectorAll(".pomo-modes .chip").forEach((x) => x.classList.remove("active"));
       c.classList.add("active");
       pomoStop();
       pomoLen = pomoLeft = +c.dataset.min * 60; pomoCounted = 0;
@@ -192,7 +212,7 @@
   const renderSchedule = () => {
     const d = day();
     const events = [...d.events].sort((a, b) => a.time.localeCompare(b.time));
-    const nowH = new Date().getHours();
+    const nowH = current === TODAY ? new Date().getHours() : -1;
     const minH = Math.min(START_H, ...events.map((e) => +e.time.slice(0, 2)));
     const maxH = Math.max(END_H, ...events.map((e) => +e.time.slice(0, 2)));
     let html = "";
@@ -209,6 +229,7 @@
     }
     $("#timeline").innerHTML = html;
     $("#schedBadge").textContent = fa(d.events.length);
+    renderWeekbar();
   };
 
   const nextHour = () => {
@@ -222,10 +243,15 @@
     const time = $("#schedTime").value;
     const title = $("#schedTitleInput").value.trim();
     if (!time || !title) return;
-    day().events.push({ id: uid(), time, title, color: $("#schedColor").value, done: false });
+    const color = $("#schedColor").value;
+    const repeat = $("#schedRepeat").checked;
+    (repeat ? weekKeys() : [current]).forEach((k) =>
+      day(k).events.push({ id: uid(), time, title, color, done: false })
+    );
     $("#schedTitleInput").value = "";
+    $("#schedRepeat").checked = false;
     save(); renderSchedule();
-    say("یادم می‌مونه! 📅");
+    say(repeat ? "برای کل هفته یادم موند! 🗓️" : "یادم می‌مونه! 📅");
   });
 
   $("#timeline").addEventListener("click", (e) => {
@@ -239,8 +265,8 @@
 
   const scrollToNow = () => {
     const tl = $("#timeline");
-    const now = tl.querySelector(".hour.now");
-    if (now) tl.scrollTop = now.offsetTop - tl.offsetTop - 40;
+    const now = tl.querySelector(".hour.now") || tl.querySelector(".event")?.closest(".hour");
+    tl.scrollTop = now ? now.offsetTop - tl.offsetTop - 40 : 0;
   };
 
   // ---------- Report ----------
@@ -262,11 +288,10 @@
     while (hasDone(dateKey(cur))) { streak++; cur.setDate(cur.getDate() - 1); }
     $("#statStreak").textContent = fa(streak);
 
-    // last 7 days
+    // the selected week (Sat → Fri)
     const days = [];
-    for (let i = 6; i >= 0; i--) {
-      const dt = new Date(); dt.setDate(dt.getDate() - i);
-      const k = dateKey(dt), rec = db.days[k];
+    for (const k of weekKeys()) {
+      const dt = parseKey(k), rec = db.days[k];
       days.push({
         k, dt,
         done: (rec?.tasks || []).filter((t) => t.done).length,
@@ -276,7 +301,7 @@
     const max = Math.max(1, ...days.map((x) => x.done));
     const wd = new Intl.DateTimeFormat("fa-IR", { weekday: "narrow" });
     $("#week").innerHTML = days.map((x) => `
-      <div class="bar ${x.k === TODAY ? "today" : ""}" title="${fa(x.done)} کار">
+      <div class="bar ${x.k === TODAY ? "today" : ""} ${x.k === current ? "active" : ""}" data-k="${x.k}" title="${fa(x.done)} کار">
         <span class="m">${MOODS[x.mood]}</span>
         <div class="col" style="height:${(x.done / max) * 80}%"></div>
         <small>${wd.format(x.dt)}</small>
@@ -296,8 +321,12 @@
     happy();
   });
 
+  $("#week").addEventListener("click", (e) => {
+    const b = e.target.closest(".bar");
+    if (b) selectDay(b.dataset.k);
+  });
+
   const note = $("#note");
-  note.value = day().note;
   note.addEventListener("input", () => { day().note = note.value; save(); });
 
   // ---------- Walking cat ----------
@@ -334,10 +363,48 @@
     }
   });
 
+  // ---------- Week bar ----------
+  const renderWeekbar = () => {
+    const keys = weekKeys();
+    $("#weekLabel").textContent = `${fmtDM.format(parseKey(keys[0]))} تا ${fmtDM.format(parseKey(keys[6]))}`;
+    $("#selDay").textContent = current === TODAY ? `امروز · ${fmtLong.format(parseKey(current))}` : fmtLong.format(parseKey(current));
+    $("#wbDays").innerHTML = keys.map((k) => {
+      const rec = db.days[k];
+      const t = rec?.tasks.length || 0, td = rec?.tasks.filter((x) => x.done).length || 0, ev = rec?.events.length || 0;
+      const info = t || ev ? `<span>✓${fa(td)}/${fa(t)}</span><span>⏰${fa(ev)}</span>` : "<span>—</span>";
+      return `<button class="wb-day ${k === TODAY ? "today" : ""} ${k === current ? "active" : ""} ${k < TODAY ? "past" : ""}" data-k="${k}">
+        <span class="wd">${fmtWd.format(parseKey(k))}</span>
+        <b>${fmtDay.format(parseKey(k))}</b>
+        <span class="info ${t || ev ? "has" : ""}">${info}</span>
+      </button>`;
+    }).join("");
+    const isToday = current === TODAY;
+    const wd = fmtWd.format(parseKey(current));
+    $("#focusDayName").textContent = isToday ? "تمرکز امروز" : `برنامه ${wd}`;
+    $("#goalLabel").textContent = isToday ? "🎯 مهم‌ترین هدف امروز" : `🎯 مهم‌ترین هدف ${wd}`;
+    $("#progressLabel").textContent = isToday ? "پیشرفت امروز" : `پیشرفت ${wd}`;
+    $("#moodTitle").textContent = isToday ? "امروز حالت چطوره؟" : `${wd} حالت چطور بود؟`;
+  };
+
+  const selectDay = (k) => {
+    current = k;
+    goal.value = day().goal;
+    note.value = day().note;
+    renderTasks();
+    renderSchedule();
+    requestAnimationFrame(scrollToNow);
+  };
+
+  $("#wbDays").addEventListener("click", (e) => {
+    const b = e.target.closest(".wb-day");
+    if (b) { selectDay(b.dataset.k); if (b.dataset.k !== TODAY) say("بریم برای این روز برنامه بچینیم 🗓️"); }
+  });
+  $("#prevWeek").addEventListener("click", () => selectDay(dateKey(addDays(parseKey(current), -7))));
+  $("#nextWeek").addEventListener("click", () => selectDay(dateKey(addDays(parseKey(current), 7))));
+  $("#goToday").addEventListener("click", () => selectDay(TODAY));
+
   // ---------- Init ----------
-  renderTasks();
-  renderSchedule();
+  selectDay(TODAY);
   pomoRender();
-  requestAnimationFrame(scrollToNow);
   setInterval(renderSchedule, 60 * 1000);
 })();
