@@ -92,10 +92,10 @@
   const pupils = cat.querySelectorAll(".pupil");
   window.addEventListener("pointermove", (e) => {
     const r = cat.getBoundingClientRect();
-    const cx = r.left + r.width / 2, cy = r.top + r.height * 0.42;
+    const cx = r.left + r.width / 2, cy = r.top + r.height * 0.73;
     const ang = Math.atan2(e.clientY - cy, e.clientX - cx);
     const dist = Math.min(1, Math.hypot(e.clientX - cx, e.clientY - cy) / 300);
-    const x = Math.cos(ang) * 7 * dist, y = Math.sin(ang) * 5 * dist;
+    const x = Math.cos(ang) * 3.5 * dist, y = Math.sin(ang) * 3.5 * dist;
     pupils.forEach((p) => (p.style.transform = `translate(${x}px, ${y}px)`));
   });
 
