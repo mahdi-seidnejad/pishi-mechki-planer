@@ -7,7 +7,7 @@
     try { return JSON.parse(localStorage.getItem(KEY)) || { days: {} }; }
     catch { return { days: {} }; }
   };
-  const db = load();
+  let db = load();
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch {} };
   // ask the browser to never evict our storage
   try { navigator.storage?.persist?.(); } catch {}
@@ -16,7 +16,7 @@
     const z = (n) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
   };
-  const TODAY = dateKey();
+  let TODAY = dateKey(); // updated automatically after midnight
   let current = TODAY; // the day being viewed / planned
   const day = (k = current) =>
     (db.days[k] ||= { goal: "", tasks: [], events: [], focusMin: 0, mood: 0, note: "" });
@@ -44,11 +44,22 @@
   const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
   // ---------- Header date ----------
-  try {
-    $("#todayDate").textContent = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
-      weekday: "long", day: "numeric", month: "long", year: "numeric",
-    }).format(new Date());
-  } catch { $("#todayDate").textContent = new Date().toDateString(); }
+  const renderHeaderDate = () => {
+    try {
+      $("#todayDate").textContent = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+        weekday: "long", day: "numeric", month: "long", year: "numeric",
+      }).format(new Date());
+    } catch { $("#todayDate").textContent = new Date().toDateString(); }
+  };
+  renderHeaderDate();
+
+  // ---------- Day stats helpers (tasks + schedule items) ----------
+  const statsOf = (rec) => {
+    const tasks = rec?.tasks || [], events = rec?.events || [];
+    const td = tasks.filter((t) => t.done).length, ed = events.filter((e) => e.done).length;
+    return { t: tasks.length, td, e: events.length, ed, total: tasks.length + events.length, done: td + ed };
+  };
+  const focusMinOf = (rec) => Math.floor(((rec?.focusSec || 0) + (rec?.focusMin || 0) * 60) / 60);
 
   // ---------- Toast & confetti ----------
   let toastT;
@@ -165,7 +176,7 @@
   });
 
   // ---------- Pomodoro ----------
-  let pomoLen = 25 * 60, pomoLeft = pomoLen, pomoTimer = null, pomoCounted = 0;
+  let pomoLen = 25 * 60, pomoLeft = pomoLen, pomoTimer = null;
   const pomoFmt = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
   const pomoRender = () => {
     $("#pomoTime").textContent = pomoFmt(pomoLeft);
@@ -176,15 +187,15 @@
   const pomoStop = () => { clearInterval(pomoTimer); pomoTimer = null; };
   const tick = () => {
     pomoLeft--;
-    const elapsedMin = Math.floor((pomoLen - pomoLeft) / 60);
-    if (elapsedMin > pomoCounted) {
-      day(TODAY).focusMin += elapsedMin - pomoCounted;
-      pomoCounted = elapsedMin;
-      save(); renderReport();
-    }
+    // every focused second is counted, so pausing never loses time
+    const t = day(TODAY);
+    t.focusSec = (t.focusSec || 0) + 1;
+    save();
+    if (current === TODAY) $("#statFocus").textContent = fa(focusMinOf(t));
     if (pomoLeft <= 0) {
       pomoStop();
-      pomoLeft = pomoLen; pomoCounted = 0;
+      pomoLeft = pomoLen;
+      renderReport();
       confetti(); say("وقت استراحته! 😽"); toast("یه جلسه تمرکز تموم شد ⏱️💚");
     }
     pomoRender();
@@ -195,14 +206,14 @@
     pomoRender();
   });
   $("#pomoReset").addEventListener("click", () => {
-    pomoStop(); pomoLeft = pomoLen; pomoCounted = 0; pomoRender();
+    pomoStop(); pomoLeft = pomoLen; pomoRender();
   });
   document.querySelectorAll(".pomo-modes .chip").forEach((c) =>
     c.addEventListener("click", () => {
       document.querySelectorAll(".pomo-modes .chip").forEach((x) => x.classList.remove("active"));
       c.classList.add("active");
       pomoStop();
-      pomoLen = pomoLeft = +c.dataset.min * 60; pomoCounted = 0;
+      pomoLen = pomoLeft = +c.dataset.min * 60;
       pomoRender();
     })
   );
@@ -228,7 +239,9 @@
       </div>`;
     }
     $("#timeline").innerHTML = html;
-    $("#schedBadge").textContent = fa(d.events.length);
+    const ed = d.events.filter((e) => e.done).length;
+    $("#schedBadge").textContent = `${fa(ed)}/${fa(d.events.length)}`;
+    renderReport();
     renderWeekbar();
   };
 
@@ -259,7 +272,11 @@
     if (!el) return;
     const d = day();
     if (e.target.closest(".del")) d.events = d.events.filter((x) => x.id !== el.dataset.id);
-    else { const ev = d.events.find((x) => x.id === el.dataset.id); ev.done = !ev.done; }
+    else {
+      const ev = d.events.find((x) => x.id === el.dataset.id);
+      ev.done = !ev.done;
+      if (ev.done) { say("یکی دیگه هم تموم شد! 🐾"); happy(); }
+    }
     save(); renderSchedule();
   });
 
@@ -273,17 +290,17 @@
   const MOODS = ["", "😿", "😾", "😺", "😸", "😻"];
   const renderReport = () => {
     const d = day();
-    const total = d.tasks.length, done = d.tasks.filter((t) => t.done).length;
-    const pct = total ? Math.round((done / total) * 100) : 0;
+    const s = statsOf(d);
+    const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
     $("#ring").style.setProperty("--p", pct);
     $("#ringText").textContent = `${fa(pct)}%`;
-    $("#statDone").textContent = fa(done);
-    $("#statFocus").textContent = fa(d.focusMin);
+    $("#statDone").textContent = `${fa(s.done)}/${fa(s.total)}`;
+    $("#statFocus").textContent = fa(focusMinOf(d));
 
-    // streak: consecutive days with at least one finished task
+    // streak: consecutive days with at least one finished task or schedule item
     let streak = 0;
     const cur = new Date();
-    const hasDone = (k) => (db.days[k]?.tasks || []).some((t) => t.done);
+    const hasDone = (k) => statsOf(db.days[k]).done > 0;
     if (!hasDone(dateKey(cur))) cur.setDate(cur.getDate() - 1);
     while (hasDone(dateKey(cur))) { streak++; cur.setDate(cur.getDate() - 1); }
     $("#statStreak").textContent = fa(streak);
@@ -294,14 +311,14 @@
       const dt = parseKey(k), rec = db.days[k];
       days.push({
         k, dt,
-        done: (rec?.tasks || []).filter((t) => t.done).length,
+        done: statsOf(rec).done,
         mood: rec?.mood || 0,
       });
     }
     const max = Math.max(1, ...days.map((x) => x.done));
     const wd = new Intl.DateTimeFormat("fa-IR", { weekday: "narrow" });
     $("#week").innerHTML = days.map((x) => `
-      <div class="bar ${x.k === TODAY ? "today" : ""} ${x.k === current ? "active" : ""}" data-k="${x.k}" title="${fa(x.done)} کار">
+      <div class="bar ${x.k === TODAY ? "today" : ""} ${x.k === current ? "active" : ""}" data-k="${x.k}" title="${fa(x.done)} مورد انجام شده">
         <span class="m">${MOODS[x.mood]}</span>
         <div class="col" style="height:${(x.done / max) * 80}%"></div>
         <small>${wd.format(x.dt)}</small>
@@ -370,8 +387,8 @@
     $("#selDay").textContent = current === TODAY ? `امروز · ${fmtLong.format(parseKey(current))}` : fmtLong.format(parseKey(current));
     $("#wbDays").innerHTML = keys.map((k) => {
       const rec = db.days[k];
-      const t = rec?.tasks.length || 0, td = rec?.tasks.filter((x) => x.done).length || 0, ev = rec?.events.length || 0;
-      const info = t || ev ? `<span>✓${fa(td)}/${fa(t)}</span><span>⏰${fa(ev)}</span>` : "<span>—</span>";
+      const { t, td, e: ev, ed } = statsOf(rec);
+      const info = t || ev ? `<span>✓${fa(td)}/${fa(t)}</span><span>⏰${fa(ed)}/${fa(ev)}</span>` : "<span>—</span>";
       return `<button class="wb-day ${k === TODAY ? "today" : ""} ${k === current ? "active" : ""} ${k < TODAY ? "past" : ""}" data-k="${k}">
         <span class="wd">${fmtWd.format(parseKey(k))}</span>
         <b>${fmtDay.format(parseKey(k))}</b>
@@ -403,8 +420,34 @@
   $("#nextWeek").addEventListener("click", () => selectDay(dateKey(addDays(parseKey(current), 7))));
   $("#goToday").addEventListener("click", () => selectDay(TODAY));
 
+  // ---------- Live updates (no refresh needed) ----------
+  // 1) clock: move the "now" line, and roll over to the new day after midnight
+  const heartbeat = () => {
+    const k = dateKey();
+    if (k !== TODAY) {
+      const wasToday = current === TODAY;
+      TODAY = k;
+      renderHeaderDate();
+      if (wasToday) { selectDay(TODAY); say("روز جدید مبارک! ☀️"); }
+      else { renderTasks(); renderSchedule(); }
+    } else {
+      renderSchedule();
+    }
+  };
+  setInterval(heartbeat, 30 * 1000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) heartbeat(); });
+
+  // 2) other tabs / windows: pick up their changes instantly
+  window.addEventListener("storage", (e) => {
+    if (e.key !== KEY) return;
+    db = load();
+    if (document.activeElement !== goal) goal.value = day().goal;
+    if (document.activeElement !== note) note.value = day().note;
+    renderTasks();
+    renderSchedule();
+  });
+
   // ---------- Init ----------
   selectDay(TODAY);
   pomoRender();
-  setInterval(renderSchedule, 60 * 1000);
 })();
